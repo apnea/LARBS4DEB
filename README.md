@@ -1,8 +1,17 @@
-# Luke's Auto-Rice Bootstrapping Scripts (LARBS)
+# LARBS4DEB based on Luke's Auto-Rice Bootstrapping Scripts (LARBS)
+
+Luke's original ported from Arch to Debian, with a tip of the hat to https://github.com/burmistr22/larbs-debian.
+
+Current: First pass done to replace pacman/AUR with apt and Debian.
+To do:
+- remove buggy zsh dependence
+- edit up progs.csv for and voidrice details
+- add CUDA & dev installs
+- add docker/kube stuff
 
 ## Installation:
 
-On an Arch-based distribution as root, run the following:
+I run this after a non graphical Debian Testing netinst (e.g. https://cdimage.debian.org/cdimage/weekly-builds/amd64/iso-cd/debian-testing-amd64-netinst.iso)
 
 ```
 curl -LO larbs.xyz/larbs.sh
@@ -28,8 +37,6 @@ beginning of the script or giving the script one of these options:
 
 - `-r`: custom dotfiles repository (URL)
 - `-p`: custom programs list/dependencies (local file or URL)
-- `-a`: a custom AUR helper (must be able to install with `-S` unless you
-  change the relevant line in the script
 
 ### The `progs.csv` list
 
