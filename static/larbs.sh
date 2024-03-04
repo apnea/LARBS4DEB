@@ -1,21 +1,21 @@
 #!/bin/sh
 
-# Luke's Auto Rice Boostrapping Script (LARBS)
-# by Luke Smith <luke@lukesmith.xyz>
+# A fork from Luke's Auto Rice Boostrapping Script (LARBS) by Luke Smith <luke@lukesmith.xyz>
+# using a fork for Debian by <burmistr1@proton.me>
 # License: GNU GPLv3
 
 ### OPTIONS AND VARIABLES ###
 
-dotfilesrepo="https://github.com/lukesmithxyz/voidrice.git"
-progsfile="https://raw.githubusercontent.com/LukeSmithxyz/LARBS/master/static/progs.csv"
-aurhelper="yay"
+dotfilesrepo="https://github.com/apnea/voidrice-debian.git"
+progsfile="https://raw.githubusercontent.com/apnea/LARBS4DEB/master/static/progs.csv"
+
 repobranch="master"
 export TERM=ansi
 
 ### FUNCTIONS ###
 
 installpkg() {
-	pacman --noconfirm --needed -S "$1" >/dev/null 2>&1
+	DEBIAN_FRONTEND=noninteractive apt install -y -q "$1" >/dev/null 2>&1
 }
 
 error() {
@@ -26,11 +26,11 @@ error() {
 
 welcomemsg() {
 	whiptail --title "Welcome!" \
-		--msgbox "Welcome to Luke's Auto-Rice Bootstrapping Script!\\n\\nThis script will automatically install a fully-featured Linux desktop, which I use as my main machine.\\n\\n-Luke" 10 60
+		--msgbox "Welcome to LARBS4DEBS based on Luke's Auto-Rice Bootstrapping Script!\\n\\nThis script will automatically install a full Linux desktop and is intended to be run post installing something like Debian Testing sans graphical desktop." 10 60
 
 	whiptail --title "Important Note!" --yes-button "All ready!" \
 		--no-button "Return..." \
-		--yesno "Be sure the computer you are using has current pacman updates and refreshed Arch keyrings.\\n\\nIf it does not, the installation of some programs might fail." 8 70
+		--yesno "Be sure you have run apt update and upgrade prior to running this script" 8 70
 }
 
 getuserandpass() {
@@ -65,6 +65,8 @@ preinstallmsg() {
 }
 
 adduserandpass() {
+	# Create wheel group if not existing
+	[ $(getent group wheel) ] || groupadd wheel
 	# Adds user `$name` with password $pass1.
 	whiptail --infobox "Adding user \"$name\"..." 7 50
 	useradd -m -g wheel -s /bin/zsh "$name" >/dev/null 2>&1 ||
@@ -76,45 +78,9 @@ adduserandpass() {
 	unset pass1 pass2
 }
 
-refreshkeys() {
-	case "$(readlink -f /sbin/init)" in
-	*systemd*)
-		whiptail --infobox "Refreshing Arch Keyring..." 7 40
-		pacman --noconfirm -S archlinux-keyring >/dev/null 2>&1
-		;;
-	*)
-		whiptail --infobox "Enabling Arch Repositories for more a more extensive software collection..." 7 40
-		pacman --noconfirm --needed -S \
-			artix-keyring artix-archlinux-support >/dev/null 2>&1
-		grep -q "^\[extra\]" /etc/pacman.conf ||
-			echo "[extra]
-Include = /etc/pacman.d/mirrorlist-arch" >>/etc/pacman.conf
-		pacman -Sy --noconfirm >/dev/null 2>&1
-		pacman-key --populate archlinux >/dev/null 2>&1
-		;;
-	esac
-}
-
-manualinstall() {
-	# Installs $1 manually. Used only for AUR helper here.
-	# Should be run after repodir is created and var is set.
-	pacman -Qq "$1" && return 0
-	whiptail --infobox "Installing \"$1\" manually." 7 50
-	sudo -u "$name" mkdir -p "$repodir/$1"
-	sudo -u "$name" git -C "$repodir" clone --depth 1 --single-branch \
-		--no-tags -q "https://aur.archlinux.org/$1.git" "$repodir/$1" ||
-		{
-			cd "$repodir/$1" || return 1
-			sudo -u "$name" git pull --force origin master
-		}
-	cd "$repodir/$1" || exit 1
-	sudo -u "$name" -D "$repodir/$1" \
-		makepkg --noconfirm -si >/dev/null 2>&1 || return 1
-}
-
 maininstall() {
-	# Installs all needed programs from main repo.
-	whiptail --title "LARBS Installation" --infobox "Installing \`$1\` ($n of $total). $1 $2" 9 70
+	# Installs all needed programs 
+	whiptail --title "LARBS4DEB Installation" --infobox "Installing \`$1\` ($n of $total). $1 $2" 9 70
 	installpkg "$1"
 }
 
@@ -122,7 +88,7 @@ gitmakeinstall() {
 	progname="${1##*/}"
 	progname="${progname%.git}"
 	dir="$repodir/$progname"
-	whiptail --title "LARBS Installation" \
+	whiptail --title "LARBS4DEB Installation" \
 		--infobox "Installing \`$progname\` ($n of $total) via \`git\` and \`make\`. $(basename "$1") $2" 8 70
 	sudo -u "$name" git -C "$repodir" clone --depth 1 --single-branch \
 		--no-tags -q "$1" "$dir" ||
@@ -136,13 +102,6 @@ gitmakeinstall() {
 	cd /tmp || return 1
 }
 
-aurinstall() {
-	whiptail --title "LARBS Installation" \
-		--infobox "Installing \`$1\` ($n of $total) from the AUR. $1 $2" 9 70
-	echo "$aurinstalled" | grep -q "^$1$" && return 1
-	sudo -u "$name" $aurhelper -S --noconfirm "$1" >/dev/null 2>&1
-}
-
 pipinstall() {
 	whiptail --title "LARBS Installation" \
 		--infobox "Installing the Python package \`$1\` ($n of $total). $1 $2" 9 70
@@ -154,13 +113,11 @@ installationloop() {
 	([ -f "$progsfile" ] && cp "$progsfile" /tmp/progs.csv) ||
 		curl -Ls "$progsfile" | sed '/^#/d' >/tmp/progs.csv
 	total=$(wc -l </tmp/progs.csv)
-	aurinstalled=$(pacman -Qqm)
 	while IFS=, read -r tag program comment; do
 		n=$((n + 1))
 		echo "$comment" | grep -q "^\".*\"$" &&
 			comment="$(echo "$comment" | sed -E "s/(^\"|\"$)//g")"
 		case "$tag" in
-		"A") aurinstall "$program" "$comment" ;;
 		"G") gitmakeinstall "$program" "$comment" ;;
 		"P") pipinstall "$program" "$comment" ;;
 		*) maininstall "$program" "$comment" ;;
@@ -253,9 +210,9 @@ finalize() {
 
 ### This is how everything happens in an intuitive format and order.
 
-# Check if user is root on Arch distro. Install whiptail.
-pacman --noconfirm --needed -Sy libnewt ||
-	error "Are you sure you're running this as the root user, are on an Arch-based distribution and have an internet connection?"
+# Check if user is root. Install whiptail.
+apt install -y -q dialog sudo ||
+	error "Are you sure you're running this as the root user and have an internet connection?"
 
 # Welcome user and pick dotfiles.
 welcomemsg || error "User exited."
@@ -271,10 +228,6 @@ preinstallmsg || error "User exited."
 
 ### The rest of the script requires no user input.
 
-# Refresh Arch keyrings.
-refreshkeys ||
-	error "Error automatically refreshing Arch keyring. Consider doing so manually."
-
 for x in curl ca-certificates base-devel git ntp zsh; do
 	whiptail --title "LARBS Installation" \
 		--infobox "Installing \`$x\` which is required to install and configure other programs." 8 70
@@ -289,23 +242,9 @@ adduserandpass || error "Error adding username and/or password."
 
 [ -f /etc/sudoers.pacnew ] && cp /etc/sudoers.pacnew /etc/sudoers # Just in case
 
-# Allow user to run sudo without password. Since AUR programs must be installed
-# in a fakeroot environment, this is required for all builds with AUR.
+# Allow user to run sudo without password.
 trap 'rm -f /etc/sudoers.d/larbs-temp' HUP INT QUIT TERM PWR EXIT
-echo "%wheel ALL=(ALL) NOPASSWD: ALL
-Defaults:%wheel runcwd=*" >/etc/sudoers.d/larbs-temp
-
-# Make pacman colorful, concurrent downloads and Pacman eye-candy.
-grep -q "ILoveCandy" /etc/pacman.conf || sed -i "/#VerbosePkgLists/a ILoveCandy" /etc/pacman.conf
-sed -Ei "s/^#(ParallelDownloads).*/\1 = 5/;/^#Color$/s/#//" /etc/pacman.conf
-
-# Use all cores for compilation.
-sed -i "s/-j2/-j$(nproc)/;/^#MAKEFLAGS/s/^#//" /etc/makepkg.conf
-
-manualinstall $aurhelper || error "Failed to install AUR helper."
-
-# Make sure .*-git AUR packages get updated automatically.
-$aurhelper -Y --save --devel
+echo "%wheel ALL=(ALL) NOPASSWD: ALL" >/etc/sudoers.d/larbs-temp
 
 # The command that does all the installing. Reads the progs.csv file and
 # installs each needed program the way required. Be sure to run this only after
@@ -318,12 +257,8 @@ installationloop
 putgitrepo "$dotfilesrepo" "/home/$name" "$repobranch"
 rm -rf "/home/$name/.git/" "/home/$name/README.md" "/home/$name/LICENSE" "/home/$name/FUNDING.yml"
 
-# Install vim plugins if not alread present.
+# Install vim plugins if not already present.
 [ ! -f "/home/$name/.config/nvim/autoload/plug.vim" ] && vimplugininstall
-
-# Most important command! Get rid of the beep!
-rmmod pcspkr
-echo "blacklist pcspkr" >/etc/modprobe.d/nobeep.conf
 
 # Make zsh the default shell for the user.
 chsh -s /bin/zsh "$name" >/dev/null 2>&1
@@ -334,7 +269,7 @@ sudo -u "$name" mkdir -p "/home/$name/.config/mpd/playlists/"
 # dbus UUID must be generated for Artix runit.
 dbus-uuidgen >/var/lib/dbus/machine-id
 
-# Use system notifications for Brave on Artix
+# Use system notifications for Brave
 echo "export \$(dbus-launch)" >/etc/profile.d/dbus.sh
 
 # Enable tap to click
@@ -370,7 +305,7 @@ pkill -u "$name" librewolf
 # Allow wheel users to sudo with password and allow several system commands
 # (like `shutdown` to run without password).
 echo "%wheel ALL=(ALL:ALL) ALL" >/etc/sudoers.d/00-larbs-wheel-can-sudo
-echo "%wheel ALL=(ALL:ALL) NOPASSWD: /usr/bin/shutdown,/usr/bin/reboot,/usr/bin/systemctl suspend,/usr/bin/wifi-menu,/usr/bin/mount,/usr/bin/umount,/usr/bin/pacman -Syu,/usr/bin/pacman -Syyu,/usr/bin/pacman -Syyu --noconfirm,/usr/bin/loadkeys,/usr/bin/pacman -Syyuw --noconfirm,/usr/bin/pacman -S -y --config /etc/pacman.conf --,/usr/bin/pacman -S -y -u --config /etc/pacman.conf --" >/etc/sudoers.d/01-larbs-cmds-without-password
+echo "%wheel ALL=(ALL:ALL) NOPASSWD: /usr/bin/shutdown,/usr/bin/reboot,/usr/bin/systemctl suspend,/usr/bin/wifi-menu,/usr/bin/mount,/usr/bin/umount,/usr/bin/loadkeys" >/etc/sudoers.d/01-larbs-cmds-without-password
 echo "Defaults editor=/usr/bin/nvim" >/etc/sudoers.d/02-larbs-visudo-editor
 mkdir -p /etc/sysctl.d
 echo "kernel.dmesg_restrict = 0" > /etc/sysctl.d/dmesg.conf
