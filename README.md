@@ -2,9 +2,8 @@
 
 Luke's original ported from Arch to Debian, with a tip of the hat to https://github.com/burmistr22/larbs-debian.
 
-Current: First pass done to replace pacman/AUR with apt and Debian.
+Current: 2nd pass done to replace pacman/AUR with apt and Debian.
 To do:
-- remove buggy zsh dependence
 - edit up progs.csv for and voidrice details
 - add CUDA & dev installs
 - add docker/kube stuff
