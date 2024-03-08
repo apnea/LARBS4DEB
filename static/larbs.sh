@@ -156,37 +156,19 @@ makeuserjs(){
 	[ ! -f "$arkenfox" ] && curl -sL "https://raw.githubusercontent.com/arkenfox/user.js/master/user.js" > "$arkenfox"
 	cat "$arkenfox" "$overrides" > "$userjs"
 	chown "$name:wheel" "$arkenfox" "$userjs"
-	# Install the updating script.
-	mkdir -p /usr/local/lib /etc/pacman.d/hooks
-	cp "/home/$name/.local/bin/arkenfox-auto-update" /usr/local/lib/
-	chown root:root /usr/local/lib/arkenfox-auto-update
-	chmod 755 /usr/local/lib/arkenfox-auto-update
-	# Trigger the update when needed via a pacman hook.
-	echo "[Trigger]
-Operation = Upgrade
-Type = Package
-Target = firefox
-Target = librewolf
-Target = librewolf-bin
-[Action]
-Description=Update Arkenfox user.js
-When=PostTransaction
-Depends=arkenfox-user.js
-Exec=/usr/local/lib/arkenfox-auto-update" > /etc/pacman.d/hooks/arkenfox.hook
+	# At this point Luke installs a pacman hook that invokes an Arkenfox user.js update from github every time the browser is updated
+	# from the repo. This is good practice as Arkenfox is stable now and receives far fewer updates than browser.
+	# apt has equivalent hooks: https://unix.stackexchange.com/questions/401126/run-a-command-before-after-ubuntu-apt-upgrade-unattended-upgrades
 }
 
 installffaddons(){
-	addonlist="ublock-origin decentraleyes istilldontcareaboutcookies vim-vixen"
+	addonlist="ublock-origin decentraleyes darkreader simple-translate vimium"
 	addontmp="$(mktemp -d)"
 	trap "rm -fr $addontmp" HUP INT QUIT TERM PWR EXIT
 	IFS=' '
 	sudo -u "$name" mkdir -p "$pdir/extensions/"
 	for addon in $addonlist; do
-		if [ "$addon" = "ublock-origin" ]; then
-			addonurl="$(curl -sL https://api.github.com/repos/gorhill/uBlock/releases/latest | grep -E 'browser_download_url.*\.firefox\.xpi' | cut -d '"' -f 4)"
-		else
-			addonurl="$(curl --silent "https://addons.mozilla.org/en-US/firefox/addon/${addon}/" | grep -o 'https://addons.mozilla.org/firefox/downloads/file/[^"]*')"
-		fi
+		addonurl="$(curl --silent "https://addons.mozilla.org/en-US/firefox/addon/${addon}/" | grep -o 'https://addons.mozilla.org/firefox/downloads/file/[^"]*')"
 		file="${addonurl##*/}"
 		sudo -u "$name" curl -LOs "$addonurl" > "$addontmp/$file"
 		id="$(unzip -p "$file" manifest.json | grep "\"id\"")"
@@ -195,10 +177,6 @@ installffaddons(){
 		mv "$file" "$pdir/extensions/$id.xpi"
 	done
 	chown -R "$name:$name" "$pdir/extensions"
-	# Fix a Vim Vixen bug with dark mode not fixed on upstream:
-	sudo -u "$name" mkdir -p "$pdir/chrome"
-	[ ! -f  "$pdir/chrome/userContent.css" ] && sudo -u "$name" echo ".vimvixen-console-frame { color-scheme: light !important; }
-#category-more-from-mozilla { display: none !important }" > "$pdir/chrome/userContent.css"
 }
 
 finalize() {
@@ -206,9 +184,15 @@ finalize() {
 		--msgbox "Congrats! Provided there were no hidden errors, the script completed successfully and all the programs and configuration files should be in place.\\n\\nTo run the new graphical environment, log out and log back in as your new user, then run the command \"startx\" to start the graphical environment (it will start automatically in tty1).\\n\\n.t Luke" 13 80
 }
 
-### THE ACTUAL SCRIPT ###
+#  __  __       _       
+# |  \/  | __ _(_)_ __  
+# | |\/| |/ _` | | '_ \ 
+# | |  | | (_| | | | | |
+# |_|  |_|\__,_|_|_| |_|
+#
 
-### This is how everything happens in an intuitive format and order.
+# Append contrib repo to all deb repo configs
+sed -i '/^deb/s/$/ contrib/' /etc/apt/sources.list
 
 # Check if user is root. Install whiptail.
 apt install -y -q dialog sudo ||
@@ -228,7 +212,7 @@ preinstallmsg || error "User exited."
 
 ### The rest of the script requires no user input.
 
-for x in curl ca-certificates base-devel git ntp zsh; do
+for x in curl ca-certificates build-essential git ntp; do
 	whiptail --title "LARBS Installation" \
 		--infobox "Installing \`$x\` which is required to install and configure other programs." 8 70
 	installpkg "$x"
