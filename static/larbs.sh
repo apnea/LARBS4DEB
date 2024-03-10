@@ -33,8 +33,8 @@ welcomemsg() {
 		--yesno "Be sure you have run apt update and upgrade prior to running this script" 8 70
 }
 
-getuserandpass() {
-	# Prompts user for new username an password.
+getuserandpass() { 
+    # Prompts user for new username an password.
 	name=$(whiptail --inputbox "First, please enter a name for the user account." 10 60 3>&1 1>&2 2>&3 3>&1) || exit 1
 	while ! echo "$name" | grep -q "^[a-z_][a-z0-9_-]*$"; do
 		name=$(whiptail --nocancel --inputbox "Username not valid. Give a username beginning with a letter, with only lowercase letters, - or _." 10 60 3>&1 1>&2 2>&3 3>&1)
@@ -47,12 +47,10 @@ getuserandpass() {
 		pass2=$(whiptail --nocancel --passwordbox "Retype password." 10 60 3>&1 1>&2 2>&3 3>&1)
 	done
 }
-
 usercheck() {
 	! { id -u "$name" >/dev/null 2>&1; } ||
 		whiptail --title "WARNING" --yes-button "CONTINUE" \
 			--no-button "No wait..." \
-			--yesno "The user \`$name\` already exists on this system. LARBS can install for a user already existing, but it will OVERWRITE any conflicting settings/dotfiles on the user account.\\n\\nLARBS will NOT overwrite your user files, documents, videos, etc., so don't worry about that, but only click <CONTINUE> if you don't mind your settings being overwritten.\\n\\nNote also that LARBS will change $name's password to the one you just gave." 14 70
 }
 
 preinstallmsg() {
@@ -194,7 +192,7 @@ finalize() {
 # Append contrib repo to all deb repo configs
 sed -i '/^deb/s/$/ contrib/' /etc/apt/sources.list
 
-# Check if user is root. Install whiptail.
+# Check if user is root. Install whiptail via dialog
 apt install -y -q dialog sudo ||
 	error "Are you sure you're running this as the root user and have an internet connection?"
 
@@ -247,9 +245,6 @@ rm -rf "/home/$name/.git/" "/home/$name/README.md" "/home/$name/LICENSE" "/home/
 sudo -u "$name" mkdir -p "/home/$name/.config/abook/"
 sudo -u "$name" mkdir -p "/home/$name/.config/mpd/playlists/"
 
-# dbus UUID must be generated for Artix runit.
-dbus-uuidgen >/var/lib/dbus/machine-id
-
 # Use system notifications for Brave
 echo "export \$(dbus-launch)" >/etc/profile.d/dbus.sh
 
@@ -263,25 +258,25 @@ echo "export \$(dbus-launch)" >/etc/profile.d/dbus.sh
 	Option "Tapping" "on"
 EndSection' >/etc/X11/xorg.conf.d/40-libinput.conf
 
-# All this below to get Librewolf installed with add-ons and non-bad settings.
+# All this below to get firefox installed with add-ons and non-bad settings.
 
 whiptail --infobox "Setting browser privacy settings and add-ons..." 7 60
 
-browserdir="/home/$name/.librewolf"
+browserdir="/home/$name/.firefox"
 profilesini="$browserdir/profiles.ini"
 
-# Start librewolf headless so it generates a profile. Then get that profile in a variable.
-sudo -u "$name" librewolf --headless >/dev/null 2>&1 &
+# Start firefox headless so it generates a profile. Then get that profile in a variable.
+sudo -u "$name" firefox --headless >/dev/null 2>&1 &
 sleep 1
-profile="$(sed -n "/Default=.*.default-default/ s/.*=//p" "$profilesini")"
+profile="$(sed -n "/Default=.*.default-release/ s/.*=//p" "$profilesini")"
 pdir="$browserdir/$profile"
 
 [ -d "$pdir" ] && makeuserjs
 
 [ -d "$pdir" ] && installffaddons
 
-# Kill the now unnecessary librewolf instance.
-pkill -u "$name" librewolf
+# Kill the now unnecessary firefox instance.
+pkill -u "$name" firefox
 
 # Allow wheel users to sudo with password and allow several system commands
 # (like `shutdown` to run without password).
