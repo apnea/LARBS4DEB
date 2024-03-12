@@ -27,7 +27,6 @@ error() {
 welcomemsg() {
 	whiptail --title "Welcome!" \
 		--msgbox "Welcome to LARBS4DEBS based on Luke's Auto-Rice Bootstrapping Script!\\n\\nThis script will automatically install a full Linux desktop and is intended to be run post installing something like Debian Testing sans graphical desktop." 10 60
-
 	whiptail --title "Important Note!" --yes-button "All ready!" \
 		--no-button "Return..." \
 		--yesno "Be sure you have run apt update and upgrade prior to running this script" 8 70
@@ -51,6 +50,7 @@ usercheck() {
 	! { id -u "$name" >/dev/null 2>&1; } ||
 		whiptail --title "WARNING" --yes-button "CONTINUE" \
 			--no-button "No wait..." \
+--yesno "The user \`$name\` already exists on this system. LARBS can install for a user already existing, but it will OVERWRITE any conflicting settings/dotfiles on the user account.\\n\\nLARBS will NOT overwrite your user files, documents, videos, etc., so don't worry about that, but only click <CONTINUE> if you don't mind your settings being overwritten.\\n\\nNote also that LARBS will change $name's password to the one you just gave." 14 70			
 }
 
 preinstallmsg() {
